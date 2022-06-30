@@ -7,7 +7,7 @@ import socket
 from ocs import ocs_agent, site_config, client_t, ocs_feed
 import argparse
 from ocs.ocs_twisted import TimeoutLock
-
+import struct
 
 class starcam_Helper:
     """
@@ -21,18 +21,63 @@ class starcam_Helper:
         unpack_data receives the astrometry data from starcamera system and unpacks it
         close closes the socket
     """
-    def __init__(self,ip_address,user_port):
+    def __init__(self,ip_address,user_port, timeout=10):
         self.ip = ip_address
         self.port = user_port
-        self.sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self.sock.connect((self.ip,self.port))
+        self.server_addr = (self.ip,self.port)
+        self.comm = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.comm.connect(self.server_addr)
+        #self.comm.settimeout(timeout)
     
     def unpack_data(self,data):
         unpacked_data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",data)
         return unpacked_data
 
+    def pack_cmds(self):
+        logodds = 1e8
+        latitude = 39.9502777778
+        longitude = -75.1877777778
+        height = 9.144
+        exposure = 700
+        timelimit = 1
+        set_focus_to_amount = 0
+        auto_focus_bool = 1
+        start_focus = 0
+        end_focus = 0
+        step_size = 5
+        photos_per_focus = 3
+        infinity_focus_bool = 0
+        set_aperture_steps = 0
+        max_aperture_bool = 0
+        make_HP_bool = 0
+        use_HP_bool = 0
+        spike_limit_value = 3
+        dynamic_hot_pixels_bool = 1
+        r_smooth_value = 2
+        high_pass_filter_bool = 0
+        r_high_pass_filter_value = 10
+        centroid_search_border_value = 1
+        filter_return_image_bool = 0
+        n_sigma_value = 2
+        star_spacing_value = 15
+        self.cmds_for_camera = struct.pack('ddddddfiiiiiiiiiifffffffff', logodds, latitude, longitude, height, exposure,
+                                       timelimit, set_focus_to_amount, auto_focus_bool, start_focus, end_focus,
+                                       step_size, photos_per_focus, infinity_focus_bool, set_aperture_steps,
+                                       max_aperture_bool, make_HP_bool, use_HP_bool, spike_limit_value,
+                                       dynamic_hot_pixels_bool, r_smooth_value, high_pass_filter_bool,
+                                       r_high_pass_filter_value, centroid_search_border_value, filter_return_image_bool,
+                                       n_sigma_value, star_spacing_value)
+
+
+    
+    def send_cmds(self):
+        self.comm.sendto(self.cmds_for_camera,(self.ip,self.port))
+        print("Commands sent to camera")
+
+
     def get_astrom_data(self):
-        self.starcamdata_raw = self.socket.recvfrom(224)
+        #print('socket.socket(socket.AF_INET,socket.SOCK_STREAM): ', socket.socket(socket.AF_INET,socket.SOCK_STREAM))
+        self.starcamdata_raw = self.comm.recvfrom(224)
         self.starcamdata_unpacked = unpack_data(self.starcamdata_raw)
         c_time = self.starcamdata_unpacked[0]
         gmt = self.starcamdata_unpacked[1]
@@ -72,20 +117,39 @@ class starcam_Agent:
             self.log.error("Starcamaera connection has times out")
             return False,"Timeout"
 
+#"""
+#    def try_set_job(self,job_name):
+#        with self.lock:
+#            if self.job==None:
+#                self.job = job_name
+#                return True, 'ok.'
+#            return False,'Conflict: "%s" is already running.'%self.job
+#"""
 
-    def try_set_job(self,job_name):
-        with self.lock:
-            if self.job==None:
-                self.job = job_name
-                return True, 'ok.'
-            return False,'Conflict: "%s" is already running.'%self.job
-    
     def set_job_done(self):
         with self.lock:
             self.job = None
 
+    @ocs_agent.param('send_commands',type=bool,default=True)
+    def send_commands(self,session,params=None):
+        """
+        send_commands()
+        **Task** - 
+
+        Parameretes:
+            standard_cmds (boolean): whether or not to send standard commands to star camera
+
+        """
+        #with self._lock.acquire_timeout(job='send_commands') as acquired:
+        #    if not acquired:
+        #        self.log.warn(f"Could not start Task because "f"{self._lock.job} is already running")
+        #        return False, "Could not acquire lock"
+        self.starcam_Helper.pack_cmds()
+        self.starcam_Helper.send_cmds()
+        return True, "Sent commands to starcamera"
+
     #Process functions
-    @ocs_agent.param('test_mode',default=False,type=bool)
+    @ocs_agent.param('_')
     def acq(self,session,params=None):
         """start_acq(test_mode=False)
         **Process** - Acquire data from starcam and write to feed.
@@ -96,22 +160,22 @@ class starcam_Agent:
         """
         if params is None:
             params={}
-        f_sample = params.get('sampling_frequency')
-        if f_sample is None:
-            f_sample = self.f_sample
-        if f_sample %1 ==0:
-            pm = Pacemaker(f_sample,True)
-        else:
-            pm = Pacemaker(f_sample)
-        wait_time = 1 / f_sample
+        #f_sample = params.get('sampling_frequency')
+        #if f_sample is None:
+        #    f_sample = self.f_sample
+        #if f_sample %1 ==0:
+        #    pm = Pacemaker(f_sample,True)
+        #else:
+        #    pm = Pacemaker(f_sample)
+        #wait_time = 1 / f_sample
 
         with self.lock.acquire_timeout(timeout=0,job='init') as acquired:
-            pm.sleep()
+            #pm.sleep()
             if not acquired:
                 self.log.warn("Coult not start init because {} is already running".format(self.lock.job))
                 return False,"Could not acquire lock"
-            ok,msg=self.try_set_job('acq')
-            if not ok: return ok,msg
+            #ok,msg=self.try_set_job('acq')
+            #if not ok: return ok,msg
             session.set_status('running')
             self.take_data = True
             while self.take_data:
@@ -151,74 +215,13 @@ class starcam_Agent:
         return (ok, {True: 'Requested process to stop',
             False: 'Failed to request process stop.'}[ok])
 
-    #Tasks
-
-    @ocs_agent.param('send_commands',default=None,type=bytes)
-    def send_commands(self,session,params=None):
-        """ send_commands(send_commands=None)
-        **Task** - Send commands to starcamera device.
-
-        Args:
-            cmds_to_camera (bytes): Commands to send to camera in byte form
-        """
-        cmds_to_camera = pack_cmds(self,session,params)
-
-        with self.lock.acquire_timeout(timeout=3,job='init') as acquired:
-            if acquired:
-                self.socket.sendto(cmds_to_camera,self.server_addr)
-            else:
-                return False, "Could not acquire lock"
-        return True,"Sent commands to starcamera"
-
-    def pack_cmds(self,session,params):
-        """pack_cmds
-        **Function** - pack parameters stored in params dictionary into a bytes object. This function gets called in the send_commands task.
-        Args:
-            params
-
-        """
-        logodds = params['logodds']
-        latitude = params['latitude']
-        longitude = params['longitude']
-        height = params['height']
-        exposure = params['exposure']
-        timelimit = params['timelimit']
-        set_focus_to_amount = params['set_focus_to_amount']
-        auto_focus_bool = params['auto_focus_bool']
-        start_focus = params['start_focus']
-        end_focus = params['end_focus']
-        step_size = params['step_size']
-        photos_per_focus = params['photos_per_focus']
-        infinity_focus_bool = params['infinity_focus_bool']
-        set_aperture_steps = params['set_aperture_steps']
-        max_aperture_bool = params['max_aperture_bool']
-        make_HP_bool = params['make_HP_bool']
-        use_HP_bool = params['use_HP_bool']
-        spike_limit_value = params['spike_limit_value']
-        dynamic_hot_pixel_bool = params['dynamic_hot_pixel_bool']
-        r_smooth_value = params['r_smooth_value']
-        high_pass_filter_bool = params['high_pass_filter_bool']
-        r_high_pass_filter_value = params['r_high_pass_filter_value']
-        centroid_search_border_value = params['centroid_search_border_value']
-        filter_return_image_bool = params['filter_return_image_bool']
-        n_sigma_value = params['n_sigma_value']
-        star_spacing_value = params['star_spacing_value']
-        cmds_for_camera = struct.pack('ddddddfiiiiiiiiiifffffffff', logodds, latitude, longitude, height, exposure,
-                                       timelimit, set_focus_to_amount, auto_focus_bool, start_focus, end_focus,
-                                       step_size, photos_per_focus, infinity_focus_bool, set_aperture_steps,
-                                       max_aperture_bool, make_HP_bool, use_HP_bool, spike_limit_value,
-                                       dynamic_hot_pixels_bool, r_smooth_value, high_pass_filter_bool,
-                                       r_high_pass_filter_value, centroid_search_border_value, filter_return_image_bool,
-                                       n_sigma_value, star_spacing_value)
-        return cmds_for_camera
-        
 def add_agent_args(parser_in=None):
     if parser_in is None:
         from argparse import ArgumentParser as A
         parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument("--ip-address",default="10.10.10.167",type=str,help="IP address of starcam computer")
-    pgroup.add_argument("--user-port",default="8000",type=str,help="Port of starcam computer")
+    pgroup.add_argument("--user-port",default="8000",type=int,help="Port of starcam computer")
     return parser_in
 
 
@@ -230,6 +233,7 @@ if __name__ =='__main__':
     starcam_agent = starcam_Agent(agent,
             ip_address = args.ip_address,
             user_port = args.user_port)
-    agent.register_process('acq',starcam_agent.acq,starcam_agen._stop_acq,startup=True)
-    agent.register_task('send_commands',starcam_agent.send_commands)
+    agent.register_task('send_commands',starcam_agent.send_commands,startup=True)
+    agent.register_process('acq',starcam_agent.acq,starcam_agent._stop_acq)
+    #agent.register_task('send_commands',starcam_agent.send_commands)
     runner.run(agent,auto_reconnect=True)
