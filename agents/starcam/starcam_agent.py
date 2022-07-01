@@ -207,8 +207,8 @@ class starcam_Agent:
                 data['data']['ir']=ir_reading
                 data['data']['astrom_solve_time']=astrom_solve_time_reading
                 data['data']['camera_time']=camera_time_reading
-                self.agent.publish_to_feed('starcamera,',data)
-            self.agent.feeds['starcamera'].flush_buffer()
+                self.agent.publish_to_feed('starcamera',data)
+            #self.agent.feeds['starcamera'].flush_buffer()
             #self.set_job_done()
 
         return True,'Acquisition exited cleanly'
