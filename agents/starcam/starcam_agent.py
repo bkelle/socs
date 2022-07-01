@@ -74,7 +74,8 @@ class starcam_Helper:
 
     def get_astrom_data(self):
         """Receive data from camera and unpack it"""
-        starcamdata_raw = self.comm.recvfrom(224)
+        (starcamdata_raw, _) = self.comm.recvfrom(224)
+        #print(starcamdata_raw)
         starcamdata_unpacked = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",starcamdata_raw)
         c_time = starcamdata_unpacked[0]
         #print(c_time)
@@ -195,8 +196,8 @@ class starcam_Agent:
                 data['data']['c_time']=c_time_reading
                 data['data']['gmt']=gmt_reading
                 data['data']['blob_num']=blob_num_reading
-                data['data']['obs_ra']=obs_ra_deading
-                data['data']['astrom_ra']=astrom_ra_deading
+                data['data']['obs_ra']=obs_ra_reading
+                data['data']['astrom_ra']=astrom_ra_reading
                 data['data']['obs_dec']=obs_dec_reading
                 data['data']['astrom_dec']=astrom_dec_reading
                 data['data']['fr']=fr_reading
@@ -207,7 +208,7 @@ class starcam_Agent:
                 data['data']['astrom_solve_time']=astrom_solve_time_reading
                 data['data']['camera_time']=camera_time_reading
                 self.agent.publish_to_feed('starcamera,',data)
-            self.agent.feeds['astrometry'].flush_buffer()
+            self.agent.feeds['starcamera'].flush_buffer()
             #self.set_job_done()
 
         return True,'Acquisition exited cleanly'
@@ -243,4 +244,5 @@ if __name__ =='__main__':
             user_port = args.user_port)
     agent.register_task('send_commands',starcam_agent.send_commands,startup=True)
     agent.register_process('acq',starcam_agent.acq,starcam_agent._stop_acq)
+    #agent.register_feed('starcamera',record=True,agg_param=agg_params,buffer_time = 1)
     runner.run(agent,auto_reconnect=False)
