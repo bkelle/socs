@@ -27,13 +27,10 @@ class starcam_Helper:
         self.server_addr = (self.ip,self.port)
         self.comm = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.comm.connect(self.server_addr)
-        #self.comm.settimeout(timeout)
+        self.comm.settimeout(timeout)
     
-    def unpack_data(self,data):
-        unpacked_data = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",data)
-        return unpacked_data
-
     def pack_cmds(self):
+        """pack commands and parameters to be sent to star camera"""
         logodds = 1e8
         latitude = 39.9502777778
         longitude = -75.1877777778
@@ -76,24 +73,29 @@ class starcam_Helper:
 
 
     def get_astrom_data(self):
-        #print('socket.socket(socket.AF_INET,socket.SOCK_STREAM): ', socket.socket(socket.AF_INET,socket.SOCK_STREAM))
-        self.starcamdata_raw = self.comm.recvfrom(224)
-        self.starcamdata_unpacked = unpack_data(self.starcamdata_raw)
-        c_time = self.starcamdata_unpacked[0]
-        gmt = self.starcamdata_unpacked[1]
-        blob_num = self.starcamdata_unpacked[2]
-        obs_ra = self.starcamdata_unpacked[3]
-        astrom_ra = self.starcamdata_unpacked[4]
-        obs_dec = self.starcamdata_unpacked[5]
-        astrom_dec = self.starcamdata_unpacked[6]
-        fr = self.starcamdata_unpacked[7]
-        ps = self.starcamdata_unpacked[8]
-        alt = self.starcamdata_unpacked[9]
-        az = self.starcamdata_unpacked[10]
-        ir = self.starcamdata_unpacked[11]
-        astrom_solve_time = self.starcamdata_unpacked[12]
-        camera_time = self.starcamdata_unpacked[13]
+        """Receive data from camera and unpack it"""
+        starcamdata_raw = self.comm.recvfrom(224)
+        starcamdata_unpacked = struct.unpack_from("dddddddddddddiiiiiiiiddiiiiiiiiiiiiiifiii",starcamdata_raw)
+        c_time = starcamdata_unpacked[0]
+        #print(c_time)
+        gmt = starcamdata_unpacked[1]
+        blob_num = starcamdata_unpacked[2]
+        obs_ra = starcamdata_unpacked[3]
+        astrom_ra = starcamdata_unpacked[4]
+        obs_dec = starcamdata_unpacked[5]
+        astrom_dec = starcamdata_unpacked[6]
+        fr = starcamdata_unpacked[7]
+        ps = starcamdata_unpacked[8]
+        alt = starcamdata_unpacked[9]
+        az = starcamdata_unpacked[10]
+        ir = starcamdata_unpacked[11]
+        astrom_solve_time = starcamdata_unpacked[12]
+        camera_time = starcamdata_unpacked[13]
         return c_time,gmt,blob_num,obs_ra,astrom_ra,obs_dec,astrom_dec,fr,ps,alt,az,ir,astrom_solve_time,camera_time
+
+    def close(self):
+        """Close the socket of the connection"""
+        self.comm.close()
 
 class starcam_Agent:
     def __init__(self, agent, ip_address, user_port):
@@ -103,6 +105,7 @@ class starcam_Agent:
         self.job = None
         self.take_data = False
         self.lock=TimeoutLock()
+        #self.acq_proc_lock = TimeoutLock()
 
         ##register feed
         agg_params={'frame_length':60}
@@ -126,9 +129,8 @@ class starcam_Agent:
 #            return False,'Conflict: "%s" is already running.'%self.job
 #"""
 
-    def set_job_done(self):
-        with self.lock:
-            self.job = None
+#    def set_job_done(self):
+#        self.job = None
 
     @ocs_agent.param('send_commands',type=bool,default=True)
     def send_commands(self,session,params=None):
@@ -140,12 +142,14 @@ class starcam_Agent:
             standard_cmds (boolean): whether or not to send standard commands to star camera
 
         """
-        #with self._lock.acquire_timeout(job='send_commands') as acquired:
-        #    if not acquired:
-        #        self.log.warn(f"Could not start Task because "f"{self._lock.job} is already running")
-        #        return False, "Could not acquire lock"
-        self.starcam_Helper.pack_cmds()
-        self.starcam_Helper.send_cmds()
+        with self.lock.acquire_timeout(job='send_commands') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+            self.log.info("Sending commands")
+            self.starcam_Helper.pack_cmds()
+            self.starcam_Helper.send_cmds()
+            #self.set_job_done()
         return True, "Sent commands to starcamera"
 
     #Process functions
@@ -169,22 +173,25 @@ class starcam_Agent:
         #    pm = Pacemaker(f_sample)
         #wait_time = 1 / f_sample
 
-        with self.lock.acquire_timeout(timeout=0,job='init') as acquired:
+        with self.lock.acquire_timeout(timeout=100,job='init') as acquired:
             #pm.sleep()
             if not acquired:
-                self.log.warn("Coult not start init because {} is already running".format(self.lock.job))
+                self.log.warn("Could not start init because {} is already running".format(self.lock.job))
                 return False,"Could not acquire lock"
             #ok,msg=self.try_set_job('acq')
             #if not ok: return ok,msg
             session.set_status('running')
+            self.log.info("Starting acquisition")
             self.take_data = True
             while self.take_data:
                 data = {
-                    'timestamp':time.time(),
+                    'timestamp': time.time(),
                     'block_name':'astrometry',
                     'data':{}
                     }
-                c_time_reading,gmt_reading,blob_num_reading,obs_ra_reading,astrom_ra_reading,obs_dec_reading,astrom_dec_reading,fr_reading,ps_reading,alt_reading,az_reading,ir_reading,astrom_solve_time_reading,camera_time_reading = starcam_Helper.get_astrom_data(self)
+                c_time_reading,gmt_reading,blob_num_reading,obs_ra_reading,astrom_ra_reading,obs_dec_reading,astrom_dec_reading,fr_reading,ps_reading,alt_reading,az_reading,ir_reading,astrom_solve_time_reading,camera_time_reading = self.starcam_Helper.get_astrom_data()
+                #all_data = self.starcam_Helper.get_astrom_data()
+                #c_time_reading = all_data[0]
                 data['data']['c_time']=c_time_reading
                 data['data']['gmt']=gmt_reading
                 data['data']['blob_num']=blob_num_reading
@@ -200,18 +207,19 @@ class starcam_Agent:
                 data['data']['astrom_solve_time']=astrom_solve_time_reading
                 data['data']['camera_time']=camera_time_reading
                 self.agent.publish_to_feed('starcamera,',data)
-            self.agent.feed['astrometry'].flush_buffer()
-            self.set_job_done()
+            self.agent.feeds['astrometry'].flush_buffer()
+            #self.set_job_done()
+
         return True,'Acquisition exited cleanly'
 
 
     def _stop_acq(self,session,params):
         ok=False
-        with self.lock:
-            if self.job == 'acq':
+        if self.take_data:
                 session.set_status('stopping')
-                self.job = '!acq'
+                self.take_data = False
                 ok = True
+                self.starcam_Helper.close()
         return (ok, {True: 'Requested process to stop',
             False: 'Failed to request process stop.'}[ok])
 
@@ -235,5 +243,4 @@ if __name__ =='__main__':
             user_port = args.user_port)
     agent.register_task('send_commands',starcam_agent.send_commands,startup=True)
     agent.register_process('acq',starcam_agent.acq,starcam_agent._stop_acq)
-    #agent.register_task('send_commands',starcam_agent.send_commands)
-    runner.run(agent,auto_reconnect=True)
+    runner.run(agent,auto_reconnect=False)
