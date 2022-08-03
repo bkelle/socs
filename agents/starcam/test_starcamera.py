@@ -1,8 +1,6 @@
-import numpy as np
 import socket
 import struct
 import os
-import time
 
 
 logodds = 1e8
