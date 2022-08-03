@@ -18,6 +18,7 @@ class starcam_Helper:
         unpack_data receives the astrometry data from starcamera system and unpacks it
         close closes the socket
     """
+
     def __init__(self, ip_address, user_port, timeout=10):
         self.ip = ip_address
         self.port = user_port
