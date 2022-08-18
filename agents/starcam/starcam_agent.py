@@ -30,9 +30,9 @@ class starcam_Helper:
     def pack_cmds(self):
         """pack commands and parameters to be sent to star camera"""
         logodds = 1e8
-        latitude = 39.9502777778
-        longitude = -75.1877777778
-        height = 9.144
+        latitude = 51.6262
+        longitude = 6.4650
+        height = 21.0
         exposure = 700
         timelimit = 1
         set_focus_to_amount = 0
@@ -157,6 +157,7 @@ class starcam_Agent:
                 data['data']['ir'] = ir_reading
                 data['data']['astrom_solve_time'] = astrom_solve_time_reading
                 data['data']['camera_time'] = camera_time_reading
+                session.data.update(data['data'])
                 self.agent.publish_to_feed('starcamera', data)
         return True, 'Acquisition exited cleanly'
 
@@ -166,7 +167,7 @@ class starcam_Agent:
             session.set_status('stopping')
             self.take_data = False
             ok = True
-            self.starcam_Helper.close()
+            #self.starcam_Helper.close()
         return (ok, {True: 'Requested process to stop', False: 'Failed to request process stop.'}[ok])
 
 
@@ -175,7 +176,7 @@ def add_agent_args(parser_in=None):
         from argparse import ArgumentParser as A
         parser_in = A()
     pgroup = parser_in.add_argument_group('Agent Options')
-    pgroup.add_argument("--ip-address", default="10.10.10.167", type=str, help="IP address of starcam computer")
+    pgroup.add_argument("--ip-address", default="192.168.1.181", type=str, help="IP address of starcam computer")
     pgroup.add_argument("--user-port", default="8000", type=int, help="Port of starcam computer")
     return parser_in
 
