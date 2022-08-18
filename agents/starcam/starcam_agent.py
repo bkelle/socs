@@ -167,7 +167,7 @@ class starcam_Agent:
             session.set_status('stopping')
             self.take_data = False
             ok = True
-            #self.starcam_Helper.close()
+            # self.starcam_Helper.close()
         return (ok, {True: 'Requested process to stop', False: 'Failed to request process stop.'}[ok])
 
 
