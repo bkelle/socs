@@ -1,7 +1,6 @@
+import os
 import socket
 import struct
-import os
-
 
 logodds = 1e8
 latitude = 39.9502777778

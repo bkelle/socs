@@ -1,8 +1,9 @@
-import time
 import socket
+import struct
+import time
+
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-import struct
 
 
 class starcam_Helper:
