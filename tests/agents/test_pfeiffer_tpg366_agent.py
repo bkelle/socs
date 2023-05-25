@@ -1,3 +1,1 @@
-import sys
-sys.path.insert(0, '../agents/pfeiffer_tpg366/')
-from pfeiffer_tpg366_agent import PfeifferAgent
+from socs.agents.pfeiffer_tpg366.agent import PfeifferAgent  # noqa: F401

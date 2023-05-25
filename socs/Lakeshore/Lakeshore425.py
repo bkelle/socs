@@ -1,5 +1,6 @@
-import serial
 import time
+
+import serial
 
 operational_status_key = [
     'No probe',
@@ -11,6 +12,8 @@ operational_status_key = [
     'Calibration error',
     'Zero probe done'
 ]
+
+
 class LakeShore425:
     def __init__(self, COM):
         self.port = serial.Serial(

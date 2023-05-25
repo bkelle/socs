@@ -1,26 +1,10 @@
-import os
 import time
-import pytest
-import signal
-import subprocess
-import coverage.data
-import urllib.request
-
-from urllib.error import URLError
-
-from ocs.matched_client import MatchedClient
 
 import ocs
+import pytest
+from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
-
-from ocs.testing import (
-    create_agent_runner_fixture,
-    create_client_fixture,
-)
-
-from integration.util import (
-    create_crossbar_fixture
-)
+from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
 from socs.testing.device_emulator import create_device_emulator
 
@@ -28,9 +12,9 @@ pytest_plugins = ("docker_compose")
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
-    '../agents/lakeshore425/LS425_agent.py', 'ls425_agent')
+    '../socs/agents/lakeshore425/agent.py', 'ls425_agent')
 run_agent_acq = create_agent_runner_fixture(
-    '../agents/lakeshore425/LS425_agent.py', 'ls425_agent', args=['--mode', 'acq'])
+    '../socs/agents/lakeshore425/agent.py', 'ls425_agent', args=['--mode', 'acq'])
 client = create_client_fixture('LS425')
 emulator = create_device_emulator({'*IDN?': 'LSCI,MODEL425,LSA425T,1.3'},
                                   relay_type='serial')
@@ -54,16 +38,16 @@ def test_ls425_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
 @pytest.mark.integtest
 def test_ls425_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client):
     resp = client.init_lakeshore.status()
-    #print(resp)
+    # print(resp)
     assert resp.status == ocs.OK
-    #print(resp.session)
+    # print(resp.session)
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
     time.sleep(3)
     resp = client.acq.status()
-    #print(resp)
+    # print(resp)
     assert resp.status == ocs.OK
-    #print(resp.session)
+    # print(resp.session)
     assert resp.session['op_code'] == OpCode.RUNNING.value
 
 

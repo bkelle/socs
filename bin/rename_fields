@@ -2,19 +2,17 @@
 # Rename fields to valid names in recorded .g3 files. Also translate from HK v0
 # to HK v1. This is heavily based on the so3g.hk.translator.
 
-import os
 import hashlib
 import logging
+import os
 import sqlite3
-
 from pathlib import Path
-from tqdm import tqdm
 
 import so3g
+from ocs.ocs_feed import Feed
 from so3g.hk.translator import HKTranslator
 from spt3g import core
-
-from ocs.ocs_feed import Feed
+from tqdm import tqdm
 
 
 class RenamerRecord:
@@ -216,6 +214,7 @@ class HKRenamer:
     changes.
 
     """
+
     def __init__(self):
         pass
 
@@ -246,10 +245,10 @@ class HKRenamer:
                 try:
                     Feed.verify_data_field_string(new_field)
                 except ValueError:
-                    raise ValueError("An unexpected invalid field name, " +
-                                     f"'{new_field}', was encountered. Please " +
-                                     "report this field name as an issue to " +
-                                     "the socs repository.")
+                    raise ValueError("An unexpected invalid field name, "
+                                     + f"'{new_field}', was encountered. Please "
+                                     + "report this field name as an issue to "
+                                     + "the socs repository.")
 
                 # print(k, new_field)
                 new_block[new_field] = core.G3VectorDouble(v)

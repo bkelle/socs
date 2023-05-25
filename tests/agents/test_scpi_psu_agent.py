@@ -1,3 +1,1 @@
-import sys
-sys.path.insert(0, '../agents/scpi_psu/')
-from scpi_psu_agent import ScpiPsuAgent
+from socs.agents.scpi_psu.agent import ScpiPsuAgent  # noqa: F401

@@ -1,3 +1,2 @@
-import sys
-sys.path.insert(0, '../agents/smurf_stream_simulator/')
-from smurf_stream_simulator import SmurfStreamSimulator
+from socs.agents.smurf_stream_simulator.agent import \
+    SmurfStreamSimulator  # noqa: F401

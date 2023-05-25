@@ -1,3 +1,1 @@
-import sys
-sys.path.insert(0, '../agents/synacc/')
-from synacc import SynaccessAgent
+from socs.agents.synacc.agent import SynaccessAgent  # noqa: F401

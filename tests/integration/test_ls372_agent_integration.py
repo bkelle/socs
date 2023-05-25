@@ -1,11 +1,10 @@
 import os
-import pytest
 
 import ocs
+import pytest
+from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
-
-from integration.util import create_crossbar_fixture
 
 from socs.testing.device_emulator import create_device_emulator
 
@@ -16,10 +15,12 @@ os.environ['OCS_CONFIG_DIR'] = os.getcwd()
 
 
 run_agent = create_agent_runner_fixture(
-                '../agents/lakeshore372/LS372_agent.py',
-                'ls372')
+    '../socs/agents/lakeshore372/agent.py',
+    'ls372',
+    args=["--log-dir", "./logs/"])
 client = create_client_fixture('LSASIM')
 wait_for_crossbar = create_crossbar_fixture()
+
 
 def build_init_responses():
     values = {'*IDN?': 'LSCI,MODEL372,LSASIM,1.3',
@@ -52,6 +53,7 @@ def build_init_responses():
                    'SRDG? A': '+000.000E+09'})
 
     return values
+
 
 emulator = create_device_emulator(build_init_responses(), relay_type='tcp', port=7777)
 
@@ -220,5 +222,75 @@ def test_ls372_set_still_output(wait_for_crossbar, emulator, run_agent, client):
 def test_ls372_get_still_output(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
     resp = client.get_still_output()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_engage_channel(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.engage_channel(channel=2, state='on')
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_set_calibration_curve(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.set_calibration_curve(channel=4, curve_number=28)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_get_input_setup(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    resp = client.get_input_setup(channel=4)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_sample_custom_pid(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    response = {'SCAN?': '02, 0',
+                'KRDG? 2': '102E-3',
+                'RANGE? 0': '5',
+                'SRDG? 2': '15.00E+03',
+                'HTRSET? 0': '50,8,+0003.00,1'}
+    emulator.define_responses(response)
+    resp = client.custom_pid.start(setpoint=0.102, heater='sample', channel=2,
+                                   P=2500, I=1 / 20, update_time=0, sample_heater_range=3.16e-3,
+                                   test_mode=True)
+    print('resp:', resp)
+    print('resp.status', resp.status)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.STARTING.value
+
+    client.custom_pid.wait()
+    resp = client.custom_pid.status()
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.SUCCEEDED.value
+
+
+@pytest.mark.integtest
+def test_ls372_still_custom_pid(wait_for_crossbar, emulator, run_agent, client):
+    client.init_lakeshore()
+    response = {'SCAN?': '05, 0',
+                'KRDG? 5': '95E-3',
+                'SRDG? 5': '15.00E+03',
+                'RANGE? 2': '1',
+                'OUTMODE? 2': '4,5,1,0,0,001',
+                'HTRSET? 2': '+1020.000,8,+0000.00,1'}
+    emulator.define_responses(response)
+    resp = client.custom_pid.start(setpoint=0.95, heater='still', channel=5,
+                                   P=0, I=1. / 7, update_time=0, test_mode=True)
+    print('resp:', resp)
+    print('resp.status', resp.status)
+    assert resp.status == ocs.OK
+    assert resp.session['op_code'] == OpCode.STARTING.value
+
+    client.custom_pid.wait()
+    resp = client.custom_pid.status()
     assert resp.status == ocs.OK
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
