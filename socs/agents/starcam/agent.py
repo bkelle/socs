@@ -181,6 +181,7 @@ def add_agent_args(parser_in=None):
     pgroup.add_argument("--user-port", default="8000", type=int, help="Port of starcam computer")
     return parser_in
 
+
 def main(args=None):
     parser = add_agent_args()
     args = site_config.parse_args(agent_class="starcam_Agent", parser=parser)
@@ -190,6 +191,7 @@ def main(args=None):
     agent.register_task('send_commands', starcam_agent.send_commands, startup=True)
     agent.register_process('acq', starcam_agent.acq, starcam_agent._stop_acq)
     runner.run(agent, auto_reconnect=False)
+
 
 if __name__ == '__main__':
     main()
